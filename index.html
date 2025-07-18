@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Art Studio - Image Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Vibrant Blues & Purples with a Warm Accent (Lavender Blush, Sky Blue, Indigo, Deep Purple, Amber) -->
+    <!-- Application Structure Plan: A single-page application focused solely on image generation. The interface directly presents the text prompt, style selection cards, generate button, and image output area. This streamlined structure prioritizes user-friendliness and direct access to the core functionality. The Python backend handles the secure API interaction. -->
+    <!-- Visualization & Content Choices:
+        1. Text Input -> Goal: Capture User Description -> Presentation: Styled Textarea -> Interaction: User types. -> Justification: Clear, prominent input.
+        2. Style Selection -> Goal: Capture Artistic Preference -> Presentation: Clickable Style Cards -> Interaction: User clicks a card to select. -> Justification: Visually engaging and intuitive selection.
+        3. Generate Button -> Goal: Trigger Generation -> Presentation: Gradient Button with Hover Effect -> Interaction: Click. -> Justification: Visually appealing call to action.
+        4. Generated Image Display -> Goal: Show Result -> Presentation: Image tag with shadow/border -> Interaction: Displays generated image. -> Justification: Direct visual output.
+        5. Download Button -> Goal: Save Image -> Presentation: Button -> Interaction: Click to download. -> Justification: Direct user utility.
+        6. Loading/Error States -> Goal: User Feedback -> Presentation: Spinners, clear text messages -> Interaction: Automatically appears/disappears. -> Justification: Essential for AI tasks.
+        All visual elements are HTML/CSS based, no SVG/Mermaid.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(to bottom right, #E0F2F7, #D1C4E9); /* Light Sky Blue to Lavender */
+            color: #2D3748; /* Dark Slate */
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border-radius: 1.5rem; /* More rounded */
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            padding: 2.5rem;
+        }
+        .btn-primary {
+            background-image: linear-gradient(to right, #6D28D9, #4C1D95); /* Deep Purple to Darker Purple */
+            color: white;
+            padding: 14px 32px;
+            border-radius: 9999px; /* Pill shape */
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: none;
+            cursor: pointer;
+        }
+        .btn-primary:hover {
+            background-image: linear-gradient(to right, #4C1D95, #6D28D9);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 10px rgba(0, 0, 0, 0.15);
+        }
+        .loading-spinner {
+            border: 5px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #FBBF24; /* Amber */
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .image-placeholder {
+            min-height: 350px; /* Slightly larger */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #F0F4F8; /* Light gray-blue */
+            border: 3px dashed #A78BFA; /* Muted Purple */
+            color: #6B7280;
+            font-style: italic;
+            border-radius: 1rem;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
+            padding: 1rem;
+        }
+        textarea {
+            border: 1px solid #CBD5E0; /* Light gray border */
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            transition: all 0.2s ease;
+        }
+        textarea:focus {
+            border-color: #8B5CF6; /* Purple focus */
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3); /* Purple ring */
+        }
+
+        /* Style Card Specifics */
+        .style-card {
+            background-color: #F8FAFC; /* Very light gray */
+            border: 2px solid #E2E8F0; /* Light gray border */
+            border-radius: 0.75rem;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .style-card:hover {
+            border-color: #A78BFA; /* Muted Purple on hover */
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .style-card.active {
+            background-color: #EDE9FE; /* Light Purple background */
+            border-color: #6D28D9; /* Deep Purple active border */
+            box-shadow: 0 0 0 4px rgba(109, 40, 217, 0.2), 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-1px);
+        }
+        .style-card-icon {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+            line-height: 1;
+        }
+        .style-card-text {
+            font-weight: 600;
+            color: #4A5568;
+        }
+        .style-card.active .style-card-text {
+            color: #4C1D95; /* Darker Purple for active text */
+        }
+        .download-btn {
+            background-color: #22C55E; /* Emerald Green */
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: background-color 0.2s ease-in-out;
+            margin-top: 1rem;
+        }
+        .download-btn:hover {
+            background-color: #16A34A; /* Darker Emerald Green */
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 flex-grow flex flex-col justify-center items-center">
+        <header class="text-center mb-10 md:mb-16">
+            <h1 class="text-5xl md:text-6xl font-extrabold text-gray-900 mb-4 drop-shadow-lg">✨ AI Art Studio ✨</h1>
+            <p class="text-xl text-gray-700 max-w-4xl mx-auto">Unleash your creativity! Describe your vision and let AI bring it to life with various artistic styles.</p>
+        </header>
+
+        <main class="w-full card">
+            <h2 class="text-4xl font-extrabold text-gray-900 mb-8 text-center">🖼️ Image Generator</h2>
+
+            <div class="mb-8">
+                <label for="text-prompt-img" class="block text-gray-700 text-xl font-semibold mb-3">What do you want to create?</label>
+                <textarea id="text-prompt-img" rows="5" class="w-full text-lg" placeholder="e.g., A majestic dragon soaring over a futuristic city at dawn, highly detailed"></textarea>
+            </div>
+
+            <div class="mb-10">
+                <h2 class="block text-gray-700 text-xl font-semibold mb-3">Choose an artistic touch:</h2>
+                <div id="style-selection-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <!-- Style cards will be injected here by JavaScript -->
+                </div>
+                <input type="hidden" id="selected-style-input" value=""> <!-- Hidden input to store selected style -->
+            </div>
+
+            <div class="text-center mb-12">
+                <button id="generate-img-btn" class="btn-primary">GENERATE IMAGE</button>
+            </div>
+
+            <div id="result-section-img" class="mt-8 text-center">
+                <div id="loading-indicator-img" class="hidden flex flex-col items-center justify-center text-indigo-700 bg-blue-50 p-8 rounded-lg shadow-inner">
+                    <div class="loading-spinner mb-4"></div>
+                    <p class="text-xl font-semibold text-gray-800">Conjuring your masterpiece...</p>
+                    <p class="text-md text-gray-600">This magical process might take a few moments.</p>
+                </div>
+                <div id="error-message-img" class="hidden text-red-600 bg-red-100 border border-red-400 p-4 rounded-lg font-semibold mb-4"></div>
+                <img id="generated-image" src="" alt="Generated Image" class="hidden w-full h-auto rounded-lg shadow-xl border-4 border-white mx-auto max-w-xl">
+                <button id="download-img-btn" class="download-btn hidden">Download Image</button>
+                <div id="image-placeholder" class="image-placeholder w-full max-w-xl mx-auto rounded-lg text-center p-8">
+                    Your generated artwork will appear here.
+                    <p class="mt-2 text-sm text-gray-500">Try a prompt like: "A whimsical treehouse nestled in a giant mushroom forest"</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const textPromptImgInput = document.getElementById('text-prompt-img');
+            const styleSelectionGrid = document.getElementById('style-selection-grid');
+            const selectedStyleInput = document.getElementById('selected-style-input');
+            const generateImgBtn = document.getElementById('generate-img-btn');
+            const loadingIndicatorImg = document.getElementById('loading-indicator-img');
+            const errorMessageImg = document.getElementById('error-message-img');
+            const generatedImage = document.getElementById('generated-image');
+            const downloadImgBtn = document.getElementById('download-img-btn');
+            const imagePlaceholder = document.getElementById('image-placeholder');
+
+            // --- Configuration ---
+            const BACKEND_API_URL = "http://127.0.0.1:5000"; // Base URL for Flask backend
+
+            const styles = [
+                { name: "No specific style", value: "", icon: "✨" },
+                { name: "Impressionistic", value: "in the style of Van Gogh", icon: "🎨" },
+                { name: "Neon Cyberpunk", value: "in the style of a cyberpunk city", icon: "🌃" },
+                { name: "Soft Watercolor", value: "in a watercolor painting style", icon: "💧" },
+                { name: "Clean Minimalist", value: "as a minimalist illustration", icon: "📏" },
+                { name: "Epic Fantasy Art", value: "as a detailed fantasy art", icon: "🐉" },
+                { name: "Retro Pixel Art", value: "in the style of a pixel art game", icon: "👾" },
+                { name: "Bold Abstract", value: "as an abstract expressionist painting", icon: "🌀" },
+                { name: "Cinematic Still", value: "as a cinematic film still", icon: "🎬" }
+            ];
+
+            // Function to render style cards for Image Generator
+            function renderStyleCards() {
+                styleSelectionGrid.innerHTML = '';
+                styles.forEach(style => {
+                    const card = document.createElement('div');
+                    card.className = 'style-card';
+                    card.dataset.value = style.value;
+                    card.innerHTML = `
+                        <div class="style-card-icon">${style.icon}</div>
+                        <div class="style-card-text">${style.name}</div>
+                    `;
+                    styleSelectionGrid.appendChild(card);
+
+                    card.addEventListener('click', () => {
+                        document.querySelectorAll('.style-card').forEach(s => s.classList.remove('active'));
+                        card.classList.add('active');
+                        selectedStyleInput.value = style.value;
+                    });
+                });
+                // Pre-select the first card (No specific style)
+                if (styles.length > 0) {
+                    styleSelectionGrid.querySelector('.style-card').click();
+                }
+            }
+
+            // --- Event Listeners ---
+
+            // Image Generation Logic
+            generateImgBtn.addEventListener('click', async () => {
+                const promptText = textPromptImgInput.value.trim();
+                const selectedStyle = selectedStyleInput.value;
+
+                if (!promptText) {
+                    errorMessageImg.textContent = 'Please enter a description for your image.';
+                    errorMessageImg.classList.remove('hidden');
+                    generatedImage.classList.add('hidden');
+                    downloadImgBtn.classList.add('hidden');
+                    imagePlaceholder.classList.remove('hidden');
+                    return;
+                }
+
+                errorMessageImg.classList.add('hidden');
+                generatedImage.classList.add('hidden');
+                downloadImgBtn.classList.add('hidden');
+                imagePlaceholder.classList.add('hidden');
+                loadingIndicatorImg.classList.remove('hidden');
+                generateImgBtn.disabled = true;
+
+                let fullPrompt = promptText;
+                if (selectedStyle) {
+                    fullPrompt += `, ${selectedStyle}`;
+                }
+
+                try {
+                    const payload = JSON.stringify({ prompt: fullPrompt });
+
+                    const response = await fetch(`${BACKEND_API_URL}/generate-image`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: payload
+                    });
+
+                    if (!response.ok) {
+                        const errorResponse = await response.json();
+                        console.error('Backend Error Response (Image):', errorResponse);
+                        let detailedMessage = `Image generation failed: ${response.status} ${response.statusText}.`;
+                        if (errorResponse && errorResponse.error) {
+                            detailedMessage += ` Details: ${errorResponse.error}`;
+                        } else {
+                            detailedMessage += ` Please check your backend server.`;
+                        }
+                        errorMessageImg.textContent = detailedMessage;
+                        errorMessageImg.classList.remove('hidden');
+                        imagePlaceholder.classList.remove('hidden');
+                        return;
+                    }
+
+                    const result = await response.json();
+                    if (result && result.image_base64) {
+                        const imageUrl = `data:image/png;base64,${result.image_base64}`;
+                        generatedImage.src = imageUrl;
+                        generatedImage.classList.remove('hidden');
+                        downloadImgBtn.classList.remove('hidden');
+                    } else {
+                        errorMessageImg.textContent = 'Failed to generate image. Unexpected response from backend.';
+                        errorMessageImg.classList.remove('hidden');
+                        imagePlaceholder.classList.remove('hidden');
+                    }
+
+                } catch (error) {
+                    console.error('Error connecting to backend or processing response (Image):', error);
+                    errorMessageImg.textContent = 'Could not connect to the image generation service. Make sure the Python backend is running.';
+                    errorMessageImg.classList.remove('hidden');
+                    imagePlaceholder.classList.remove('hidden');
+                } finally {
+                    loadingIndicatorImg.classList.add('hidden');
+                    generateImgBtn.disabled = false;
+                }
+            });
+
+            // Download Image Button
+            downloadImgBtn.addEventListener('click', () => {
+                const imageUrl = generatedImage.src;
+                if (imageUrl && imageUrl !== '') {
+                    const a = document.createElement('a');
+                    a.href = imageUrl;
+                    a.download = 'ai_generated_art.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                }
+            });
+
+            // Initial setup
+            renderStyleCards();
+        });
+    </script>
+</body>
+</html>
